@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 
 
 def metric_expr(output_dict, *args) -> Dict[str, paddle.Tensor]:
-    return {"dummy_loss": paddle.to_tensor(0.0)}
+    return {"dummy_loss": paddle.full([], 0.0)}
 
 
 # transform
@@ -73,7 +73,7 @@ def train_loss_func2(result_dict, *args) -> paddle.Tensor:
     # total loss
     loss = loss_u + loss_udot + loss_ut_c + loss_e
     loss = paddle.square(loss)
-    return loss
+    return {"loss2": loss}
 
 
 def train_loss_func3(result_dict, *args) -> paddle.Tensor:
@@ -106,7 +106,7 @@ def train_loss_func3(result_dict, *args) -> paddle.Tensor:
 
     loss = loss_u + loss_udot + loss_ut_c + loss_gt_c + loss_e
     loss = paddle.square(loss)
-    return loss
+    return {"loss3": loss}
 
 
 class Dataset:

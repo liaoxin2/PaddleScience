@@ -22,7 +22,6 @@ def compute_enso_score(
         y_true (paddle.Tensor): The label data.
         acc_weight (Optional[Union[str, np.ndarray, paddle.Tensor]], optional): The wight of accuracy. Defaults to None.use
             default acc_weight specified at https://tianchi.aliyun.com/competition/entrance/531871/information.
-
     """
 
     pred = y_pred - y_pred.mean(axis=0, keepdim=True)  # (N, 24)
@@ -83,7 +82,9 @@ def train_mse_func(
     label_dict: Dict[str, "paddle.Tensor"],
     *args,
 ) -> paddle.Tensor:
-    return F.mse_loss(output_dict["sst_target"], label_dict["sst_target"])
+    return {
+        "sst_target": F.mse_loss(output_dict["sst_target"], label_dict["sst_target"])
+    }
 
 
 def eval_rmse_func(

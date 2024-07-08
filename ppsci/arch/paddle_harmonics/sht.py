@@ -39,11 +39,11 @@ import paddle
 import paddle.fft
 import paddle.nn as nn
 
-from ppsci.paddle_harmonics.legendre import _precompute_dlegpoly
-from ppsci.paddle_harmonics.legendre import _precompute_legpoly
-from ppsci.paddle_harmonics.quadrature import clenshaw_curtiss_weights
-from ppsci.paddle_harmonics.quadrature import legendre_gauss_weights
-from ppsci.paddle_harmonics.quadrature import lobatto_weights
+from ppsci.arch.paddle_harmonics.legendre import _precompute_dlegpoly
+from ppsci.arch.paddle_harmonics.legendre import _precompute_legpoly
+from ppsci.arch.paddle_harmonics.quadrature import clenshaw_curtiss_weights
+from ppsci.arch.paddle_harmonics.quadrature import legendre_gauss_weights
+from ppsci.arch.paddle_harmonics.quadrature import lobatto_weights
 
 
 class RealSHT(nn.Layer):
@@ -56,6 +56,7 @@ class RealSHT(nn.Layer):
     [2] Wang, B., Wang, L., Xie, Z.; Accurate calculation of spherical and vector spherical harmonic expansions via spectral element grids; Adv Comput Math.
 
     Initializes the SHT Layer, precomputing the necessary quadrature weights.
+
     Args:
         nlat (int): Input grid resolution in the latitudinal direction.
         nlon (int): Input grid resolution in the longitudinal direction.
@@ -234,7 +235,6 @@ class RealVectorSHT(nn.Layer):
     [2] Wang, B., Wang, L., Xie, Z.; Accurate calculation of spherical and vector spherical harmonic expansions via spectral element grids; Adv Comput Math.
 
     Initializes the vector SHT Layer, precomputing the necessary quadrature weights.
-
     """
 
     def __init__(

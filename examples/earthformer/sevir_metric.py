@@ -117,7 +117,7 @@ class SEVIRSkillScore:
     @staticmethod
     def bias(hits, misses, fas, eps):
         bias = (hits + fas) / (hits + misses + eps)
-        logbias = paddle.pow(bias / paddle.log(paddle.to_tensor(2.0)), 2.0)
+        logbias = paddle.pow(bias / paddle.log(paddle.full([], 2.0)), 2.0)
         return logbias
 
     @property
@@ -278,4 +278,4 @@ def train_mse_func(
     pred = output_dict["vil"]
     vil_target = label_dict["vil"]
     target = vil_target.reshape([-1, *vil_target.shape[2:]])
-    return F.mse_loss(pred, target)
+    return {"vil": F.mse_loss(pred, target)}

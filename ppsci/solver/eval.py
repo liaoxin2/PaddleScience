@@ -25,6 +25,7 @@ import paddle
 from paddle import io
 
 from ppsci.solver import printer
+from ppsci.utils import logger
 from ppsci.utils import misc
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ def _eval_by_dataset(
             computed during evaluation.
     """
     target_metric: float = float("inf")
+    metric_dict_group: Dict[str, Dict[str, float]] = misc.PrettyOrderedDict()
     for _, _validator in solver.validator.items():
         all_output = misc.Prettydefaultdict(list)
         all_label = misc.Prettydefaultdict(list)
@@ -111,7 +113,9 @@ def _eval_by_dataset(
                     weight_dict,
                 )
 
-            loss_dict[f"{_validator.name}/loss"] = float(validator_loss)
+            loss_dict[f"{_validator.name}/loss"] = float(
+                sum(list(validator_loss.values()))
+            )
 
             for key, output in output_dict.items():
                 all_output[key].append(
@@ -161,10 +165,14 @@ def _eval_by_dataset(
             if len(all_label[key]) > num_samples:
                 all_label[key] = all_label[key][:num_samples]
 
-        metric_dict_group: Dict[str, Dict[str, float]] = misc.PrettyOrderedDict()
         for metric_name, metric_func in _validator.metric.items():
             # NOTE: compute metric with entire output and label
             metric_dict = metric_func(all_output, all_label)
+            if metric_name in metric_dict_group:
+                logger.warning(
+                    f"Metric name({metric_name}) already exists, please ensure "
+                    "all metric names are unique over all validators."
+                )
             metric_dict_group[metric_name] = {
                 k: float(v) for k, v in metric_dict.items()
             }
@@ -208,11 +216,11 @@ def _eval_by_batch(
             computed during evaluation.
     """
     target_metric: float = float("inf")
+    metric_dict_group: Dict[str, Dict[str, float]] = misc.PrettyOrderedDict()
     for _, _validator in solver.validator.items():
         num_samples = _get_dataset_length(_validator.data_loader)
 
         loss_dict = misc.Prettydefaultdict(float)
-        metric_dict_group: Dict[str, Dict[str, float]] = misc.PrettyOrderedDict()
         reader_tic = time.perf_counter()
         batch_tic = time.perf_counter()
         for iter_id, batch in enumerate(_validator.data_loader, start=1):
@@ -242,13 +250,14 @@ def _eval_by_batch(
                     weight_dict,
                 )
 
-            loss_dict[f"{_validator.name}/loss"] = float(validator_loss)
+            loss_dict[f"{_validator.name}/loss"] = float(
+                sum(list(validator_loss.values()))
+            )
 
             # collect batch metric
             for metric_name, metric_func in _validator.metric.items():
+                metric_dict_group[metric_name] = misc.Prettydefaultdict(list)
                 metric_dict = metric_func(output_dict, label_dict)
-                if metric_name not in metric_dict_group:
-                    metric_dict_group[metric_name] = misc.Prettydefaultdict(list)
                 for var_name, metric_value in metric_dict.items():
                     metric_dict_group[metric_name][var_name].append(
                         metric_value
@@ -278,10 +287,15 @@ def _eval_by_batch(
 
         # concatenate all metric and discard metric of padded sample(s)
         for metric_name, metric_dict in metric_dict_group.items():
+            if metric_name in metric_dict_group:
+                logger.warning(
+                    f"Metric name({metric_name}) already exists, please ensure "
+                    "all metric names are unique over all validators."
+                )
             for var_name, metric_value in metric_dict.items():
-                # NOTE: concat all metric(scalars) into metric vector
+                # NOTE: concat single metric(scalar) list into metric vector
                 metric_value = paddle.concat(metric_value)[:num_samples]
-                # NOTE: compute metric via averaging metric vector,
+                # NOTE: compute metric via averaging metric over all samples,
                 # this might be not general for certain evaluation case
                 metric_value = float(metric_value.mean())
                 metric_dict_group[metric_name][var_name] = metric_value
