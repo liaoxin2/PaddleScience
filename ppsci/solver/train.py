@@ -45,7 +45,6 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
                 f"Training iteration {solver.global_step + 1}"
             )  # Training iteration
 
-        total_loss = 0.0
         total_batch_size = 0
         reader_cost = 0.0
         batch_cost = 0.0
@@ -62,11 +61,6 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
                 _constraint.data_iter = iter(_constraint.data_loader)
                 input_dict, label_dict, weight_dict = next(_constraint.data_iter)
             reader_cost += time.perf_counter() - reader_tic
-
-            # NOTE: eliminate first 5 step for warmup
-            if iter_id == 5:
-                for key in solver.train_time_info:
-                    solver.train_time_info[key].reset()
 
             for v in input_dict.values():
                 if hasattr(v, "stop_gradient"):
@@ -87,7 +81,7 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
                 if solver.nvtx_flag:  # only for nsight analysis
                     core.nvprof_nvtx_push("Loss computation")
 
-                constraint_losses = solver.forward_helper.train_forward(
+                losses_all, losses_constraint = solver.forward_helper.train_forward(
                     tuple(
                         _constraint.output_expr
                         for _constraint in solver.constraint.values()
@@ -98,6 +92,10 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
                     label_dicts,
                     weight_dicts,
                 )
+                assert "loss" not in losses_all, (
+                    "Key 'loss' is not allowed in loss_dict for it is an preserved key"
+                    " representing total loss, please use other name instead."
+                )
 
                 if solver.nvtx_flag:  # only for nsight analysis
                     core.nvprof_nvtx_pop()  # Loss computation
@@ -106,31 +104,25 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
                 if solver.nvtx_flag:  # only for nsight analysis
                     core.nvprof_nvtx_push("Loss aggregator")
 
-                for i, _constraint in enumerate(solver.constraint.values()):
-                    total_loss += constraint_losses[i]
-                    loss_dict[_constraint.name] += (
-                        float(constraint_losses[i]) / solver.update_freq
-                    )
+                total_loss = solver.loss_aggregator(losses_all, solver.global_step)
                 if solver.update_freq > 1:
                     total_loss = total_loss / solver.update_freq
 
+                loss_dict.update(losses_constraint)
+                loss_dict["loss"] = float(total_loss)
+
                 if solver.nvtx_flag:  # only for nsight analysis
                     core.nvprof_nvtx_pop()  # Loss aggregator
-
-                loss_dict["loss"] = float(total_loss)
 
             # backward
             if solver.nvtx_flag:  # only for nsight analysis
                 core.nvprof_nvtx_push("Loss backward")
 
-            if solver.loss_aggregator is None:
-                if solver.use_amp:
-                    total_loss_scaled = solver.scaler.scale(total_loss)
-                    total_loss_scaled.backward()
-                else:
-                    total_loss.backward()
+            if solver.use_amp:
+                total_loss_scaled = solver.scaler.scale(total_loss)
+                total_loss_scaled.backward()
             else:
-                solver.loss_aggregator(constraint_losses, solver.global_step).backward()
+                total_loss.backward()
 
             if solver.nvtx_flag:  # only for nsight analysis
                 core.nvprof_nvtx_pop()  # Loss backward
@@ -167,7 +159,11 @@ def train_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int):
         solver.train_time_info["reader_cost"].update(reader_cost)
         solver.train_time_info["batch_cost"].update(batch_cost)
         printer.update_train_loss(solver, loss_dict, total_batch_size)
-        if solver.global_step % log_freq == 0 or solver.global_step == 1:
+        if (
+            solver.global_step % log_freq == 0
+            or solver.global_step == 1
+            or solver.global_step == solver.max_steps
+        ):
             printer.log_train_info(solver, total_batch_size, epoch_id, iter_id)
 
         batch_tic = time.perf_counter()
@@ -233,11 +229,10 @@ def train_LBFGS_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int
             Returns:
                 paddle.Tensor: Computed loss scalar.
             """
-            total_loss = 0
             with solver.no_sync_context_manager(solver.world_size > 1, solver.model):
                 with solver.autocast_context_manager(solver.use_amp, solver.amp_level):
                     # forward for every constraint, including model and equation expression
-                    constraint_losses = solver.forward_helper.train_forward(
+                    losses_all, losses_constraint = solver.forward_helper.train_forward(
                         tuple(
                             _constraint.output_expr
                             for _constraint in solver.constraint.values()
@@ -248,20 +243,15 @@ def train_LBFGS_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int
                         label_dicts,
                         weight_dicts,
                     )
+
                     # accumulate all losses
-                    for i, _constraint in enumerate(solver.constraint.values()):
-                        total_loss += constraint_losses[i]
-                        loss_dict[_constraint.name] = float(constraint_losses[i])
+                    total_loss = solver.loss_aggregator(losses_all, solver.global_step)
+                    loss_dict.update(losses_constraint)
                     loss_dict["loss"] = float(total_loss)
 
                 # backward
                 solver.optimizer.clear_grad()
-                if solver.loss_aggregator is None:
-                    total_loss.backward()
-                else:
-                    solver.loss_aggregator(
-                        constraint_losses, solver.global_step
-                    ).backward()
+                total_loss.backward()
 
             if solver.world_size > 1:
                 # fuse + allreduce manually before optimization if use DDP model
@@ -286,7 +276,11 @@ def train_LBFGS_epoch_func(solver: "solver.Solver", epoch_id: int, log_freq: int
         solver.train_time_info["reader_cost"].update(reader_cost)
         solver.train_time_info["batch_cost"].update(batch_cost)
         printer.update_train_loss(solver, loss_dict, total_batch_size)
-        if solver.global_step % log_freq == 0 or solver.global_step == 1:
+        if (
+            solver.global_step % log_freq == 0
+            or solver.global_step == 1
+            or solver.global_step == solver.max_steps
+        ):
             printer.log_train_info(solver, total_batch_size, epoch_id, iter_id)
 
         batch_tic = time.perf_counter()

@@ -18,6 +18,7 @@ This module is adapted from [https://github.com/lululxvi/deepxde](https://github
 
 from __future__ import annotations
 
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -59,8 +60,8 @@ class _Jacobian:
         retain_graph: Optional[bool] = None,
         create_graph: bool = True,
     ) -> "paddle.Tensor":
-        """Returns J[`i`][`j`]. If `j` is ``None``, returns the gradient of y_i, i.e.,
-        J[i].
+        """
+        Returns J[`i`][`j`]. If `j` is ``None``, returns the gradient of y_i, i.e. J[i].
         """
         if not 0 <= i < self.dim_y:
             raise ValueError(f"i({i}) should in range [0, {self.dim_y}).")
@@ -164,7 +165,17 @@ class Jacobians:
 
 
 # Use high-order differentiation with singleton pattern for convenient
-jacobian = Jacobians()
+jacobian: Callable[
+    [
+        "paddle.Tensor",
+        Union["paddle.Tensor", List["paddle.Tensor"]],
+        int,
+        Optional[int],
+        Optional[bool],
+        bool,
+    ],
+    Union["paddle.Tensor", List["paddle.Tensor"]],
+] = Jacobians()
 
 
 class _Hessian:
@@ -259,8 +270,8 @@ class Hessians:
             component (Optional[int]): If `y` has the shape (batch_size, dim_y > 1), then `y[:, component]`
                 is used to compute the Hessian. Do not use if `y` has the shape (batch_size,
                 1). Defaults to None.
-            i (int, optional): i-th input variable. Defaults to 0.
-            j (int, optional): j-th input variable. Defaults to 0.
+            i (int, optional): I-th input variable. Defaults to 0.
+            j (int, optional): J-th input variable. Defaults to 0.
             grad_y (Optional[paddle.Tensor]): The gradient of `y` w.r.t. `xs`. Provide `grad_y` if known to avoid
                 duplicate computation. Defaults to None.
             retain_graph (Optional[bool]): Whether to retain the forward graph which
@@ -283,6 +294,8 @@ class Hessians:
             >>> x.stop_gradient = False
             >>> y = (x * x).sin()
             >>> dy_dxx = ppsci.autodiff.hessian(y, x, component=0)
+            >>> print(dy_dxx.shape)
+            [4, 1]
         """
         key = (ys, xs, component)
         if key not in self.Hs:
@@ -295,10 +308,34 @@ class Hessians:
 
 
 # Use high-order differentiation with singleton pattern for convenient
-hessian = Hessians()
+hessian: Callable[
+    [
+        "paddle.Tensor",
+        "paddle.Tensor",
+        Optional[int],
+        int,
+        int,
+        Optional["paddle.Tensor"],
+        Optional[bool],
+        bool,
+    ],
+    "paddle.Tensor",
+] = Hessians()
 
 
 def clear():
-    """Clear cached Jacobians and Hessians."""
+    """Clear cached Jacobians and Hessians.
+
+    Examples:
+        >>> import paddle
+        >>> import ppsci
+        >>> x = paddle.randn([4, 3])
+        >>> x.stop_gradient = False
+        >>> y = (x * x).sin()
+        >>> dy_dxx = ppsci.autodiff.hessian(y, x, component=0)
+        >>> ppsci.autodiff.clear()
+        >>> print(ppsci.autodiff.hessian.Hs)
+        {}
+    """
     jacobian._clear()
     hessian._clear()

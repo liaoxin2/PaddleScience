@@ -1,11 +1,11 @@
-# Skillful High Resolution Regional Short Term Forecasting with Boundary Smoothing
+# A Study of Data-driven Limited Area Model for Weather Forecasting
 
-YingLong, a high-resolution, short-term regional weather forecasting, artificial-intelligence-based model, which is capable of hourly predicting weather fields including wind speed, temperature, and specific humidity at a 3km resolution. YingLong utilizes a parallel structure of global and local blocks to capture multiscale meteorological features and is trained on analysis dataset. Additionally, the necessary information around the regional boundary is introduced to YingLong through the boundary smoothing strategy, which significantly improves the regional forecasting results. By comparing forecast results with those from WRF-ARW, one of the best numerical prediction models, YingLong demonstrates superior forecasting performances in most cases, especially on surface variables.
+Recently, artificial intelligence-based models for forecasting global weather have been rapidly developed. Most of the global models are trained on reanalysis datasets with a spatial resolution of 0.25◦ × 0.25◦. However, study on artificial intelligence-based limited area weather forecasting models is still limited. In this study, an artificial intelligence-based limited area weather forecasting model (YingLong) is developed. YingLong utilizes a parallel structure of global and local blocks to capture multiscale meteorological features. Its predictability on surface temperature, humidity and wind speed is comparable to the predictability of the dynamical limited area model WRF-ARW, but with a much faster running speed. YingLong is also applied to investigate the issues related to the lateral boundary condition of artificial intelligence-based limited area models. The difference between artificial intelligence-based limited area models and dynamical limited area models is also discussed.
 
-This code is the implementation of YingLong. We select the southeastern region of the United States, which is around the range of 110-130E, 15-35N, with 440 × 408 grid points in Lambert projection.
+This code is the implementation of YingLong. We select the southeastern region of the United States, which is around the range of 80-110W, 30-42N, with 440 × 408 grid points in Lambert projection.
 
 <div align=center>
-    <img src="doc/fig_arch1.jpg" width="70%" height="auto" >
+    <img src="doc/fig_arch1.jpeg" width="70%" height="auto" >
 </div>
 
 ## Installation
@@ -45,23 +45,29 @@ export PYTHONPATH=$PWD
 
 ``` shell
 cd examples/yinglong
-wget https://paddle-org.bj.bcebos.com/paddlescience/datasets/yinglong/hrrr_example_24vars.tar
-tar -xvf hrrr_example_24vars.tar
-wget https://paddle-org.bj.bcebos.com/paddlescience/datasets/yinglong/hrrr_example_69vars.tar
-tar -xvf hrrr_example_69vars.tar
+wget https://paddle-org.bj.bcebos.com/paddlescience/datasets/yinglong/western_valid_data.tar
+tar -xvf western_valid_data.tar
+wget https://paddle-org.bj.bcebos.com/paddlescience/datasets/yinglong/eastern_valid_data.tar
+tar -xvf eastern_valid_data.tar
 wget https://paddle-org.bj.bcebos.com/paddlescience/models/yinglong/inference.tar
 tar -xvf inference.tar
 ```
 
 ### 2. Run the code
 
-The following code runs the Yinglong model, and the model output will be saved in 'output/result.npy'.
+The following code runs the YingLong model, and the model output will be saved in `outputs_yinglong_eastern(western)/result.npy`.
 
 ``` shell
-# YingLong-12 Layers
-python predict_12layers.py mode=infer
-# YingLong-24 Layers
-python predict_24layers.py mode=infer
+# yinglong_eastern
+python predict.py -cn=yinglong_eastern.yaml
+# yinglong_western
+python predict.py -cn=yinglong_western.yaml
 ```
 
-We also visualized the predicted wind speed at 10 meters above ground level, with an initial field of 0:00 on January 1, 2022. Click [here](https://paddle-org.bj.bcebos.com/paddlescience/docs/Yinglong/result.gif) to view the prediction results.
+We also visualized the predicted wind speed at 10 meters above ground level, with an initial field of 0:00 on January 1, 2022. Click [eastern](https://paddle-org.bj.bcebos.com/paddlescience/docs/Yinglong/result_eastern.gif)/[western](https://paddle-org.bj.bcebos.com/paddlescience/docs/Yinglong/result_western.gif) to view the prediction results.
+
+## License
+
+YingLong was released by Shanghai Zhangjiang Institute of Mathematics, Baidu inc.
+
+The commercial use of these models is forbidden.

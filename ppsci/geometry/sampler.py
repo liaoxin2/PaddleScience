@@ -25,7 +25,7 @@ from typing_extensions import Literal
 
 
 def sample(
-    n_samples: int, ndim: int, method: Literal["pseudo", "LHS"] = "pseudo"
+    n_samples: int, ndim: int, method: Literal["pseudo", "Halton", "LHS"] = "pseudo"
 ) -> np.ndarray:
     """Generate pseudorandom or quasi-random samples in [0, 1]^ndim.
 
@@ -35,6 +35,7 @@ def sample(
         method (str): One of the following: "pseudo" (pseudorandom), "LHS" (Latin
             hypercube sampling), "Halton" (Halton sequence), "Hammersley" (Hammersley
             sequence), or "Sobol" (Sobol sequence).
+
     Returns:
         np.ndarray: Generated random samples with shape of [n_samples, ndim].
     """

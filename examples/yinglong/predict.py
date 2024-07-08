@@ -20,11 +20,26 @@ import numpy as np
 import paddle
 import pandas as pd
 from omegaconf import DictConfig
+from omegaconf import ListConfig
 from packaging import version
 
 from examples.yinglong.plot import save_plot_weather_from_dict
 from examples.yinglong.predictor import YingLongPredictor
 from ppsci.utils import logger
+
+
+def read_h5py(filename):
+    """Read hdf5 file."""
+    if isinstance(filename, str):
+        data = np.array(h5py.File(filename, "r")["fields"])
+    elif isinstance(filename, ListConfig):
+        data = [h5py.File(x, "r")["fields"] for x in filename]
+        data = np.concatenate(data, axis=0)
+    else:
+        raise TypeError(
+            f"The type of INFER.input_file must be str or list, but got {type(filename)}"
+        )
+    return data
 
 
 def inference(cfg: DictConfig):
@@ -50,15 +65,16 @@ def inference(cfg: DictConfig):
     # The variable name is 'z50', 'z500', 'z850', 'z1000', 't50', 't500', 't850', 'z1000',
     # 's50', 's500', 's850', 's1000', 'u50', 'u500', 'u850', 'u1000', 'v50', 'v500',
     # 'v850', 'v1000', 'mslp', 'u10', 'v10', 't2m'.
-    input_file = h5py.File(cfg.INFER.input_file, "r")["fields"]
-    nwp_file = h5py.File(cfg.INFER.nwp_file, "r")["fields"]
+    input_data = read_h5py(cfg.INFER.input_file)
+    nwp_data = read_h5py(cfg.INFER.nwp_file)
+    geo_data = read_h5py(cfg.INFER.geo_file)
 
     # input_data.shape: (1, 24, 440, 408)
-    input_data = input_file[0:1]
+    input_data_0 = input_data[0:1]
     # nwp_data.shape: # (num_timestamps, 24, 440, 408)
-    nwp_data = nwp_file[0:num_timestamps]
+    nwp_data = nwp_data[0:num_timestamps]
     # ground_truth.shape: (num_timestamps, 24, 440, 408)
-    ground_truth = input_file[1 : num_timestamps + 1]
+    ground_truth = input_data[1 : num_timestamps + 1]
 
     # create time stamps
     cur_time = pd.to_datetime(cfg.INFER.init_time, format="%Y/%m/%d/%H")
@@ -68,7 +84,7 @@ def inference(cfg: DictConfig):
         time_stamps.append([cur_time])
 
     # run predictor
-    pred_data = predictor.predict(input_data, time_stamps, nwp_data)
+    pred_data = predictor.predict(input_data_0, time_stamps, nwp_data, geo_data)
     pred_data = pred_data.squeeze(axis=1)  # (num_timestamps, 24, 440, 408)
 
     # save predict data
@@ -103,12 +119,14 @@ def inference(cfg: DictConfig):
         vmin=0,
         vmax=15,
         colorbar_label="m/s",
-        num_timestamps=12,  # only plot 12 timestamps
+        num_timestamps=48,
     )
     logger.info(f"Save plot to {cfg.output_dir}")
 
 
-@hydra.main(version_base=None, config_path="./conf", config_name="yinglong_12.yaml")
+@hydra.main(
+    version_base=None, config_path="./conf", config_name="yinglong_eastern.yaml"
+)
 def main(cfg: DictConfig):
     if cfg.mode == "infer":
         inference(cfg)

@@ -92,6 +92,10 @@ def log_train_info(
         log_str += f", {max_mem_reserved_msg}, {max_mem_allocated_msg}"
     logger.info(log_str)
 
+    # reset time information after printing
+    for key in solver.train_time_info:
+        solver.train_time_info[key].reset()
+
     logger.scalar(
         {
             "train/lr": solver.optimizer.get_lr(),
@@ -132,19 +136,29 @@ def log_eval_info(
 
     epoch_width = len(str(solver.epochs))
     iters_width = len(str(iters_per_epoch))
-    logger.info(
-        f"[Eval][Epoch {epoch_id:>{epoch_width}}/{solver.epochs}]"
-        f"[Iter {iter_id:>{iters_width}}/{iters_per_epoch}] "
-        f"{metric_msg}, {time_msg}, {ips_msg}, {eta_msg}"
-    )
+    if isinstance(epoch_id, int):
+        logger.info(
+            f"[Eval][Epoch {epoch_id:>{epoch_width}}/{solver.epochs}]"
+            f"[Iter {iter_id:>{iters_width}}/{iters_per_epoch}] "
+            f"{metric_msg}, {time_msg}, {ips_msg}, {eta_msg}"
+        )
+    else:
+        logger.info(
+            f"[Eval][Iter {iter_id:>{iters_width}}/{iters_per_epoch}] "
+            f"{metric_msg}, {time_msg}, {ips_msg}, {eta_msg}"
+        )
 
-    logger.scalar(
-        {
-            f"eval/{key}": solver.eval_output_info[key].avg
-            for key in solver.eval_output_info
-        },
-        step=solver.global_step,
-        vdl_writer=solver.vdl_writer,
-        wandb_writer=solver.wandb_writer,
-        tbd_writer=solver.tbd_writer,
-    )
+    # reset time information after printing
+    for key in solver.train_time_info:
+        solver.train_time_info[key].reset()
+
+    # logger.scalar(
+    #     {
+    #         f"eval/{key}": solver.eval_output_info[key].avg
+    #         for key in solver.eval_output_info
+    #     },
+    #     step=solver.global_step,
+    #     vdl_writer=solver.vdl_writer,
+    #     wandb_writer=solver.wandb_writer,
+    #     tbd_writer=solver.tbd_writer,
+    # )

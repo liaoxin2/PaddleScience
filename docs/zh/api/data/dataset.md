@@ -9,6 +9,7 @@
         - ChipHeatDataset
         - CSVDataset
         - IterableCSVDataset
+        - ContinuousNamedArrayDataset
         - ERA5Dataset
         - ERA5SampledDataset
         - IterableMatDataset
@@ -24,4 +25,6 @@
         - RadarDataset
         - build_dataset
         - DGMRDataset
+        - DarcyFlowDataset
+        - SphericalSWEDataset
       show_root_heading: true

@@ -36,6 +36,7 @@ __all__ = [
     "uniform_",
     "normal_",
     "trunc_normal_",
+    "glorot_normal_",
     "constant_",
     "ones_",
     "zeros_",
@@ -113,8 +114,8 @@ def uniform_(tensor: paddle.Tensor, a: float, b: float) -> paddle.Tensor:
 
     Args:
         tensor (paddle.Tensor): Paddle Tensor.
-        a (float): min value.
-        b (float): max value.
+        a (float): Min value.
+        b (float): Max value.
 
     Returns:
         paddle.Tensor: Initialized tensor.
@@ -135,8 +136,8 @@ def normal_(
 
     Args:
         tensor (paddle.Tensor): Paddle Tensor.
-        mean (float, optional): mean value. Defaults to 0.0.
-        std (float, optional): std value. Defaults to 1.0.
+        mean (float, optional): Mean value. Defaults to 0.0.
+        std (float, optional): Std value. Defaults to 1.0.
 
     Returns:
         paddle.Tensor: Initialized tensor.
@@ -183,7 +184,7 @@ def constant_(tensor: paddle.Tensor, value: float = 0.0) -> paddle.Tensor:
 
     Args:
         tensor (paddle.Tensor): Paddle Tensor.
-        value (float, optional): value to fill tensor. Defaults to 0.0.
+        value (float, optional): Value to fill tensor. Defaults to 0.0.
 
     Returns:
         paddle.Tensor: Initialized tensor.
@@ -239,7 +240,7 @@ def _calculate_fan_in_and_fan_out(tensor, reverse=False):
 
     Args:
         tensor (paddle.Tensor): paddle.Tensor.
-        reverse (bool): tensor data format order, False by default as [fout, fin, ...].
+        reverse (bool): Tensor data format order, False by default as [fout, fin, ...].
             e.g. : conv.weight [cout, cin, kh, kw] is False; linear.weight [cin, cout]
             is True.
 
@@ -300,7 +301,7 @@ def xavier_normal_(
     Args:
         tensor (paddle.Tensor): Paddle Tensor.
         gain (float, optional): Hyperparameter. Defaults to 1.0.
-        reverse (bool, optional): tensor data format order, False by
+        reverse (bool, optional): Tensor data format order, False by
             default as [fout, fin, ...]. Defaults to False.
 
     Returns:
@@ -380,7 +381,7 @@ def kaiming_uniform_(
         mode (Literal[&quot;fan_in&quot;, &quot;fan_out&quot;], optional):
             ["fan_in", "fan_out"]. Defaults to "fan_in".
         nonlinearity (str, optional): Nonlinearity method name. Defaults to "leaky_relu".
-        reverse (bool, optional): tensor data format order, False by default as
+        reverse (bool, optional): Tensor data format order, False by default as
             [fout, fin, ...].. Defaults to False.
 
     Returns:
@@ -469,3 +470,29 @@ def conv_init_(module: nn.Layer) -> None:
         if fan_in != 0:
             bound = 1 / math.sqrt(fan_in)
             uniform_(module.bias, -bound, bound)
+
+
+def glorot_normal_(tensor: paddle.Tensor) -> paddle.Tensor:
+    """Modify tensor inplace using jax-style glorot_normal.
+
+    Args:
+        tensor (paddle.Tensor): Paddle Tensor/Paramter.
+
+    Returns:
+        paddle.Tensor: Initialized tensor.
+
+    Examples:
+        >>> import paddle
+        >>> import ppsci
+        >>> param = paddle.empty((128, 256), "float32")
+        >>> param = ppsci.utils.initializer.glorot_normal_(param)
+    """
+    assert (
+        tensor.ndim == 2
+    ), f"glorot_normal_ only support 2D tensor now, but got ndim={tensor.ndim}"
+    fin, fout = tensor.shape
+    var = 2.0 / (fin + fout)
+    stddev = math.sqrt(var) * 0.87962566103423978
+    trunc_normal_(tensor)
+    tensor.set_value(tensor * stddev)
+    return tensor

@@ -104,7 +104,7 @@ def init_logger(
     # add file_handler, output to log_file(if specified), only for rank 0 device
     if log_file is not None and dist.get_rank() == 0:
         log_file_folder = os.path.dirname(log_file)
-        if os.path.isdir(log_file_folder):
+        if len(log_file_folder):
             os.makedirs(log_file_folder, exist_ok=True)
         file_formatter = logging.Formatter(
             "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
@@ -209,8 +209,9 @@ def scalar(
     Args:
         metric_dict (Dict[str, float]): Metrics dict with metric name and value.
         step (int): The step of the metric.
-        vdl_writer (visualdl.LogWriter): VisualDL writer to record metrics. Defaults to None.
-        wandb_writer (wandb.run): Run object of WandB to record metrics. Defaults to None.
+        vdl_writer (Optional[visualdl.LogWriter]): VisualDL writer to record metrics. Defaults to None.
+        wandb_writer (Optional[wandb.run]): Run object of WandB to record metrics. Defaults to None.
+        tbd_writer (Optional[tbd.SummaryWriter]): Run object of WandB to record metrics. Defaults to None.
     """
     if vdl_writer is not None:
         with misc.RankZeroOnly() as is_master:
@@ -242,8 +243,8 @@ def advertise():
     ==                                                       ==
     ==     https://github.com/PaddlePaddle/PaddleScience     ==
     ===========================================================
-
     """
+
     _copyright = "PaddleScience is powered by PaddlePaddle !"
     ad = "Please refer to the following website for more info."
     website = "https://github.com/PaddlePaddle/PaddleScience"
